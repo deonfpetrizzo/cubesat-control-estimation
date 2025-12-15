@@ -1,8 +1,5 @@
 import numpy as np
 
-# ============================================================
-# Quaternion utility functions
-# ============================================================
 def quat_mul(q, r):
     q0, qv = q[0], q[1:]
     r0, rv = r[0], r[1:]
@@ -29,7 +26,6 @@ def small_angle_from_quat(q):
     return q[1:]
 
 def quat_to_dcm(q):
-    """ Returns direction cosine matrix from quaternion (inertial to body frame). """
     q0, q1, q2, q3 = q
     return np.array([
         [1-2*(q2*q2+q3*q3),   2*(q1*q2+q0*q3),   2*(q1*q3-q0*q2)],

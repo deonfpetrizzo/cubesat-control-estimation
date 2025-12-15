@@ -1,11 +1,9 @@
 import numpy as np
 from geomagnetic import *
-from params import *
+import params
 from quaternions import *
 
-# ============================================================
-# Satellite dynamics (true model used for simulation)
-# ============================================================
+
 def sat_dynamics(t, x, control_fn):
     q = x[0:4]
     w = x[4:7]

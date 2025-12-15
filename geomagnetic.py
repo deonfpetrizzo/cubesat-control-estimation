@@ -1,9 +1,8 @@
 import numpy as np
 from quaternions import *
 
-# ============================================================
-# Geomagnetic field model (Tilted Dipole, ECI->ECEF->Body)
-# ============================================================
+
+# Geomagnetic field model (Tilted Dipole, ECI to ECEF to Body)
 mu_earth = 3.986004418e14
 Re = 6371e3
 wE = 7.292115e-5        # Earth rotation rate
@@ -22,7 +21,7 @@ def orbit_position_ecef(t, a=6771e3, inc=incl):
         np.sin(u)*np.sin(inc)
     ])
 
-    # Earth rotation -> ECI -> ECEF
+    # Earth rotation to ECI to ECEF
     theta = wE * t
     Rz = np.array([
         [ np.cos(theta),  np.sin(theta), 0],

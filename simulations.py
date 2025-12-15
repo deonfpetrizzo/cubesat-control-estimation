@@ -6,12 +6,9 @@ from controllers import *
 from dynamics import *
 from estimation import *
 from geomagnetic import *
-from params import *
 from quaternions import *
+import params
 
-# ============================================================
-# Simulations
-# ============================================================
 def simulate_bdot_detumble():
     dt = 0.5
     T = 5000
@@ -21,14 +18,18 @@ def simulate_bdot_detumble():
     w0 = np.deg2rad([0.0, 0.5, 50.0])
     h0 = np.zeros(3)
 
+    # True gyro bias
+    b_true = np.deg2rad([0.05, -0.03, 0.02])
+
     x_true = np.hstack([q0, w0, h0])
 
     ekf = EKF(dt)
     ekf.x[0:4] = normalize_quat(q0 + np.hstack([0.0, np.deg2rad([0.5, -0.3, 0.2])]))
     ekf.x[4:7] = w0 + np.deg2rad([0.5, -0.3, 0.2])
+    ekf.x[7:10] = np.zeros(3)  # initial bias estimate
 
     x_hist = np.zeros((len(t_eval), 10))
-    x_est_hist = np.zeros((len(t_eval), 7))
+    x_est_hist = np.zeros((len(t_eval), 10))
     m_hist = np.zeros((len(t_eval), 3))
 
     for i, tt in enumerate(t_eval):
@@ -37,7 +38,6 @@ def simulate_bdot_detumble():
 
         B_est = geomagnetic_field_body(q_est, tt)
         m_cmd = bdot_controller(w_est, B_est)
-
         m_hist[i, :] = m_cmd
 
         def ctrl(q, w, h, t):
@@ -53,12 +53,12 @@ def simulate_bdot_detumble():
 
         x_true = sol_ivp.y[:, -1]
         x_true[0:4] = normalize_quat(x_true[0:4])
-
         x_hist[i, :] = x_true.copy()
 
         q_true = x_true[0:4]
         w_true = x_true[4:7]
-        meas = get_measurement_from_truth(q_true, w_true)
+
+        meas = get_measurement_from_truth(q_true, w_true, b_true)
 
         ekf.predict(Tc=np.zeros(3), m_dipole=m_cmd, t_curr=tt)
         ekf.update(meas)
@@ -69,25 +69,17 @@ def simulate_bdot_detumble():
     omega_est = np.rad2deg(x_est_hist[:, 4:7])
 
     plt.figure(figsize=(12, 7))
-
     plt.subplot(2, 1, 1)
-    plt.plot(t_eval, omega_true[:, 0], label="wx true")
-    plt.plot(t_eval, omega_true[:, 1], label="wy true")
-    plt.plot(t_eval, omega_true[:, 2], label="wz true")
-    plt.ylabel("Angular rate (deg/s)")
-    plt.title("B-dot detumbling: true angular rates.")
-    plt.grid(True)
-    plt.legend()
+    plt.plot(t_eval, omega_true)
+    plt.legend(["wx", "wy", "wz"])
+    plt.title("True angular rates")
+    plt.grid()
 
     plt.subplot(2, 1, 2)
-    plt.plot(t_eval, omega_est[:, 0], "--", label="wx est")
-    plt.plot(t_eval, omega_est[:, 1], "--", label="wy est")
-    plt.plot(t_eval, omega_est[:, 2], "--", label="wz est")
-    plt.xlabel("Time (s)")
-    plt.ylabel("Angular rate (deg/s)")
-    plt.title("B-dot detumbling: EKF estimated angular rates.")
-    plt.grid(True)
-    plt.legend()
+    plt.plot(t_eval, omega_est, "--")
+    plt.legend(["wx est", "wy est", "wz est"])
+    plt.title("EKF estimated angular rates")
+    plt.grid()
 
     plt.tight_layout()
     plt.show()
@@ -95,53 +87,63 @@ def simulate_bdot_detumble():
 def simulate_lqr_pointing():
     K = lqr_gain()
 
-    dt = 0.05 
+    dt = 0.05
     T = 100
-    t_eval = np.arange(0, T+dt, dt)
+    t_eval = np.arange(0, T + dt, dt)
 
     q0 = normalize_quat(np.array(np.deg2rad([1, 100, 0, 100])))
     w0 = np.deg2rad([2.5, 2, 5])
     h0 = np.zeros(3)
+
+    b_true = np.deg2rad([0.05, -0.03, 0.02])
+
     x_true = np.hstack([q0, w0, h0])
     q_des = np.array([1.0, 0.0, 0.0, 0.0])
 
     ekf = EKF(dt)
     ekf.x[0:4] = normalize_quat(q0 + np.hstack([0.0, np.deg2rad([0.5, -0.5, 0.3])]))
     ekf.x[4:7] = w0 + np.deg2rad([0.1, -0.1, 0.2])
+    ekf.x[7:10] = np.zeros(3)
 
     x_hist = np.zeros((len(t_eval), 10))
-    x_est_hist = np.zeros((len(t_eval), 7))
+    x_est_hist = np.zeros((len(t_eval), 10))
     u_hist = np.zeros((len(t_eval), 3))
 
     for i, tt in enumerate(t_eval):
         q_est = ekf.x[0:4]
         w_est = ekf.x[4:7]
-        x_est = np.hstack([q_est[1:], w_est]) 
+
+        x_est = np.hstack([q_est[1:], w_est])
         u = -K @ x_est
         u = np.clip(u, -params.rw_torque_max, params.rw_torque_max)
-
-        u_hist[i,:] = u
+        u_hist[i, :] = u
 
         def ctrl(q, w, h, t):
-            Tc = u
-            return Tc, np.zeros(3)
+            return u, np.zeros(3)
 
-        sol_ivp = solve_ivp(sat_dynamics, [tt, tt+dt], x_true, args=(ctrl,), t_eval=[tt+dt])
+        sol_ivp = solve_ivp(
+            sat_dynamics,
+            [tt, tt + dt],
+            x_true,
+            args=(ctrl,),
+            t_eval=[tt + dt]
+        )
+
         x_true = sol_ivp.y[:, -1]
         x_true[0:4] = normalize_quat(x_true[0:4])
-
-        x_hist[i,:] = x_true.copy()
+        x_hist[i, :] = x_true.copy()
 
         q_true = x_true[0:4]
         w_true = x_true[4:7]
-        meas = get_measurement_from_truth(q_true, w_true)
+
+        meas = get_measurement_from_truth(q_true, w_true, b_true)
 
         ekf.predict(Tc=u, m_dipole=np.zeros(3), t_curr=tt)
         ekf.update(meas)
 
-        x_est_hist[i,:] = ekf.x.copy()
+        x_est_hist[i, :] = ekf.x.copy()
 
-    omega = np.rad2deg(x_hist[:,4:7])
+        omega = np.rad2deg(x_hist[:,4:7])
     q_hist = x_hist[:,0:4]
 
     q_err = np.zeros((len(t_eval),3))
@@ -189,6 +191,7 @@ def simulate_lqr_pointing():
 
     plt.tight_layout()
     plt.show()
+
 
 def simulate_wheel_desaturation():
     dt = 0.5

@@ -1,12 +1,10 @@
 import numpy as np
 from scipy.linalg import solve_continuous_are
 from geomagnetic import *
-from params import *
+import params
 from quaternions import *
 
-# ============================================================
-# Controllers
-# ============================================================
+
 def bdot_controller(omega, B, k=1.2e4):
     m = -k*np.cross(omega, B)
     n = np.linalg.norm(m)
@@ -39,7 +37,7 @@ def lqr_gain():
     K = np.linalg.inv(R) @ B.T @ P
     return K
 
-def cross_product_controller(h, B, k=15000.0, h_ref=None):
+def cross_product_controller(h, B, k=1.5e4, h_ref=None):
     if h_ref is None:
         h_ref = np.zeros(3)
     he = h - h_ref

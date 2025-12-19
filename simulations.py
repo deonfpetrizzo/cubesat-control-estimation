@@ -72,13 +72,16 @@ def simulate_bdot_detumble():
     plt.subplot(2, 1, 1)
     plt.plot(t_eval, omega_true)
     plt.legend(["wx", "wy", "wz"])
-    plt.title("True angular rates")
+    plt.title("True angular rates.")
+    plt.ylabel("Angular rate (deg/s)")
     plt.grid()
 
     plt.subplot(2, 1, 2)
     plt.plot(t_eval, omega_est, "--")
     plt.legend(["wx est", "wy est", "wz est"])
-    plt.title("EKF estimated angular rates")
+    plt.title("EKF estimated angular rates.")
+    plt.ylabel("Angular rate (deg/s)")
+    plt.xlabel("Time (s)")
     plt.grid()
 
     plt.tight_layout()

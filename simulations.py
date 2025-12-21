@@ -195,7 +195,6 @@ def simulate_lqr_pointing():
     plt.tight_layout()
     plt.show()
 
-
 def simulate_wheel_desaturation():
     dt = 0.5
     T = 500
